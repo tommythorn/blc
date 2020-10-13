@@ -1,19 +1,19 @@
 #![warn(missing_docs)] // warn if there is missing docs
-//! Binary Lambda Calculus Playground
-//!
-//! This module defines a representation of λ-calculus and
-//! provides parsers and printers for it.  The aim of this module
-//! is to enable experimentation with the binary encoding described
-//! by John Tromp, see [https://en.wikipedia.org/wiki/Binary_combinatory_logic][BLC]
-//! and [https://tromp.github.io/cl/diagrams.html][Diagrams]
-//!
-//! Encoding
-//! ```
-//! <term> ::= 00                      abstraction
-//!          | 01 <term> <term>        application
-//!          | 1 <var>                 variable
-//! <var> ::= 0 | 1 <var>
-//! ```
+                       //! Binary Lambda Calculus Playground
+                       //!
+                       //! This module defines a representation of λ-calculus and
+                       //! provides parsers and printers for it.  The aim of this module
+                       //! is to enable experimentation with the binary encoding described
+                       //! by John Tromp, see [https://en.wikipedia.org/wiki/Binary_combinatory_logic][BLC]
+                       //! and [https://tromp.github.io/cl/diagrams.html][Diagrams]
+                       //!
+                       //! Encoding
+                       //! ```
+                       //! <term> ::= 00                      abstraction
+                       //!          | 01 <term> <term>        application
+                       //!          | 1 <var>                 variable
+                       //! <var> ::= 0 | 1 <var>
+                       //! ```
 
 mod list;
 
@@ -84,7 +84,7 @@ fn trim() {
     assert_eq!("  abc  ".trim_start(), "abc  ")
 }
 
-fn parse_var<'a>(src: &'a str) -> Result<(&'a str, &'a str), &'a str> {
+fn parse_var(src: &str) -> Result<(&str, &str), &str> {
     let src = src.trim_start();
 
     if src == "" {
@@ -101,7 +101,7 @@ fn parse_var<'a>(src: &'a str) -> Result<(&'a str, &'a str), &'a str> {
         }
     }
 
-    return Ok((src, ""));
+    Ok((src, ""))
 }
 
 #[test]
@@ -154,20 +154,16 @@ fn parse_exp<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), &
 }
 
 fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), &'a str> {
-    match parse_match(src, "λ") {
-        Some(src) => return parse_abs(src, env),
-        None => {}
+    if let Some(src) = parse_match(src, "λ") {
+        return parse_abs(src, env);
     }
 
-    match parse_match(src, "(") {
-        Some(src) => {
-            let (res, src) = parse_exp(src, env)?;
-            match parse_match(src, ")") {
-                Some(src) => return Ok((res, src)),
-                None => return Err("missing )"),
-            }
+    if let Some(src) = parse_match(src, "(") {
+        let (res, src) = parse_exp(src, env)?;
+        match parse_match(src, ")") {
+            Some(src) => return Ok((res, src)),
+            None => return Err("missing )"),
         }
-        None => {}
     }
 
     let (v, src) = parse_var(src)?;

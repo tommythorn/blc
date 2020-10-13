@@ -1,32 +1,32 @@
 #![warn(missing_docs)] // warn if there is missing docs
-//! Generic functional list implementation.
-//!
-//! Single linked lists in Rust are tricky because there are many trade-off
-//! that doesn't apply in other languages.  However, list is the natural
-//! data structure for environments (which grow and shrink as we enter and
-//! exit abstractions).
-//!
-//! The implementation below is inspired by a the famous page about too many
-//! linked list, but adapted to fit the BLC compiler, notably, `next` borrows
-//! the list.
-//!
-//! # Example usage
-//! ```
-//! use blc::list::*;
-//!
-//! // Create a list of all known allprimes
-//! let allprimes = cons(7, &Nil);
-//! let allprimes = cons(5, &allprimes);
-//! let allprimes = cons(3, &allprimes);
-//! let allprimes = cons(2, &allprimes);
-//!
-//! // traverse it
-//! let mut primes = &allprimes;
-//! while !is_empty(primes) {
-//!     println!(" {}", head(primes).unwrap());
-//!     primes = tail(primes).unwrap();
-//! }
-//!```
+                       //! Generic functional list implementation.
+                       //!
+                       //! Single linked lists in Rust are tricky because there are many trade-off
+                       //! that doesn't apply in other languages.  However, list is the natural
+                       //! data structure for environments (which grow and shrink as we enter and
+                       //! exit abstractions).
+                       //!
+                       //! The implementation below is inspired by a the famous page about too many
+                       //! linked list, but adapted to fit the BLC compiler, notably, `next` borrows
+                       //! the list.
+                       //!
+                       //! # Example usage
+                       //! ```
+                       //! use blc::list::*;
+                       //!
+                       //! // Create a list of all known allprimes
+                       //! let allprimes = cons(7, &Nil);
+                       //! let allprimes = cons(5, &allprimes);
+                       //! let allprimes = cons(3, &allprimes);
+                       //! let allprimes = cons(2, &allprimes);
+                       //!
+                       //! // traverse it
+                       //! let mut primes = &allprimes;
+                       //! while !is_empty(primes) {
+                       //!     println!(" {}", head(primes).unwrap());
+                       //!     primes = tail(primes).unwrap();
+                       //! }
+                       //!```
 
 /// A non-empty list is a boxed list node.
 #[derive(Debug, PartialEq)]
@@ -46,11 +46,8 @@ pub fn cons<'a, T>(elem: T, next: &'a List<'a, T>) -> List<'a, T> {
 }
 
 /// True on 0-level lists
-pub fn is_empty<'a, T>(list: &'a List<'a, T>) -> bool {
-    match list {
-        Nil => true,
-        _ => false,
-    }
+pub fn is_empty<T>(list: &List<T>) -> bool {
+    matches!(list, Nil)
 }
 
 /// Returns the first element in the list wrapped in `Some` or `None` on empty lists.
