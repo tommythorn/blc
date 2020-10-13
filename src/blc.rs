@@ -17,6 +17,7 @@
 
 mod list;
 
+use list::List::*;
 use list::*;
 use std::fmt;
 use std::ops::Sub;
@@ -122,7 +123,7 @@ fn parse_abs<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), &
     let src = src.trim_start();
 
     if let Ok((var, src)) = parse_var(src) {
-        let (body, src) = parse_abs(src, &cons(var, env))?;
+        let (body, src) = parse_abs(src, &cons(var, &env))?;
         return Ok((Ab(Box::new(body)), src));
     }
 
@@ -173,15 +174,14 @@ fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), 
     let mut e = env;
     let mut n = 0;
     loop {
-        match e {
-            Some(node) => {
-                if node.head == v {
-                    return Ok((Va(n), src));
-                }
-                e = node.tail;
-                n += 1;
+        if !is_empty(e) {
+            if head(e) == Some(&v) {
+                return Ok((Va(n), src));
             }
-            None => return Err("Unknown variable"),
+            e = tail(e).unwrap();
+            n += 1;
+        } else {
+            return Err("Unknown variable");
         }
     }
 }
@@ -189,26 +189,26 @@ fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), 
 #[test]
 fn test_parse_term() {
     let i = Ab(Box::new(Va(0)));
-    assert_eq!(parse_term("λx.x", &None), Ok((i.clone(), "")));
+    assert_eq!(parse_term("λx.x", &Nil), Ok((i.clone(), "")));
     assert_eq!(
-        parse_term("λx y.x", &None),
+        parse_term("λx y.x", &Nil),
         Ok((Ab(Box::new(Ab(Box::new(Va(1))))), ""))
     );
-    assert_eq!(parse_term("(λx.x)", &None), Ok((i.clone(), "")));
+    assert_eq!(parse_term("(λx.x)", &Nil), Ok((i.clone(), "")));
     {
         let x = Box::new(Va(0));
         let ap = Box::new(Ap(x.clone(), x));
         let ab = Ab(ap);
-        assert_eq!(&parse_term("λx.x x", &None), &Ok((ab.clone(), "")));
-        assert_eq!(parse_term("λx.(x) (x)", &None), Ok((ab.clone(), "")));
-        assert_eq!(parse_term("λx.(x x)", &None), Ok((ab.clone(), "")));
+        assert_eq!(&parse_term("λx.x x", &Nil), &Ok((ab.clone(), "")));
+        assert_eq!(parse_term("λx.(x) (x)", &Nil), Ok((ab.clone(), "")));
+        assert_eq!(parse_term("λx.(x x)", &Nil), Ok((ab.clone(), "")));
         assert_eq!(
-            parse_term("  λ  x  .  (  (  x  )  (  x  )  )  ", &None),
+            parse_term("  λ  x  .  (  (  x  )  (  x  )  )  ", &Nil),
             Ok((ab.clone(), "  "))
         );
     }
     assert_eq!(
-        parse_exp("(λx.x)(λx.x)", &None),
+        parse_exp("(λx.x)(λx.x)", &Nil),
         Ok((ap(i.clone(), i.clone()), ""))
     );
 }
@@ -218,7 +218,7 @@ mod test {
     use super::*;
 
     fn round_trip(src: &str, expected: &str) -> Result<(), String> {
-        let (e, src) = parse_exp(src, &None)?;
+        let (e, src) = parse_exp(src, &Nil)?;
         assert_eq!(src.trim_start(), "");
         assert_eq!(e.to_string(), expected);
         Ok(())
@@ -239,7 +239,7 @@ mod test {
 }
 
 pub fn main() {
-    println!("{:?}", parse_exp("x", &None));
+    println!("{:?}", parse_exp("x", &Nil));
     println!(
         "{:?}",
         Ap(Box::new(Ab(Box::new(Va(0)))), Box::new(Ab(Box::new(Va(0)))))
