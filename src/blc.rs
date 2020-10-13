@@ -1,44 +1,26 @@
-// 20201011 Playground for Binary lambda,
-// see https://en.wikipedia.org/wiki/Binary_combinatory_logic
-// and https://tromp.github.io/cl/diagrams.html
-//
-// Encoding
-// <term> ::= 00                      abstraction
-//          | 01 <term> <term>        application
-//          | 1 <var>                 variable
-// <var> ::= 0 | 1 <var>
+#![warn(missing_docs)] // warn if there is missing docs
+//! Binary Lambda Calculus Playground
+//!
+//! This module defines a representation of λ-calculus and
+//! provides parsers and printers for it.  The aim of this module
+//! is to enable experimentation with the binary encoding described
+//! by John Tromp, see [https://en.wikipedia.org/wiki/Binary_combinatory_logic][BLC]
+//! and [https://tromp.github.io/cl/diagrams.html][Diagrams]
+//!
+//! Encoding
+//! ```
+//! <term> ::= 00                      abstraction
+//!          | 01 <term> <term>        application
+//!          | 1 <var>                 variable
+//! <var> ::= 0 | 1 <var>
+//! ```
 
+mod list;
+
+use list::*;
 use std::fmt;
 use std::ops::Sub;
-
-// Need a list for environments.  Even though they are frowned up,
-// they are the most conciently to express exactly what is going on.
-// XXX migrate to a module when stable
-pub type List<'a, T> = Option<Box<Node<'a, T>>>;
-
-pub struct Node<'a, T> {
-    elem: T,
-    next: &'a List<'a, T>,
-}
-
-// These are convience functions and for sorting out
-// types in isolation
-#[allow(dead_code)]
-pub fn cons<'a, T>(elem: T, next: &'a List<'a, T>) -> List<'a, T> {
-    Some(Box::new(Node { elem, next }))
-}
-
-#[allow(dead_code)]
-pub fn head<T>(list: List<T>) -> Option<T> {
-    match list {
-        None => None,
-        Some(n) => {
-            // Alas, `Some(box Node { elem, next: _ }) =>` is experimental
-            // let Node { elem, next: _ } = *n;
-            Some(n.elem)
-        }
-    }
-}
+use Term::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Term {
@@ -46,8 +28,6 @@ pub enum Term {
     Ap(Box<Term>, Box<Term>), // Application
     Va(usize),                // de Bruijn encoded variable
 }
-
-use Term::*;
 
 pub fn ap(t1: Term, t2: Term) -> Term {
     Ap(Box::new(t1), Box::new(t2))
@@ -195,10 +175,10 @@ fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), 
     loop {
         match e {
             Some(node) => {
-                if node.elem == v {
+                if node.head == v {
                     return Ok((Va(n), src));
                 }
-                e = node.next;
+                e = node.tail;
                 n += 1;
             }
             None => return Err("Unknown variable"),
