@@ -1,51 +1,41 @@
-#![warn(missing_docs)] // warn if there is missing docs
-                       //! Binary Lambda Calculus Playground
-                       //!
-                       //! This module defines a representation of λ-calculus and
-                       //! provides parsers and printers for it.  The aim of this module
-                       //! is to enable experimentation with the binary encoding described
-                       //! by John Tromp, see [https://en.wikipedia.org/wiki/Binary_combinatory_logic][BLC]
-                       //! and [https://tromp.github.io/cl/diagrams.html][Diagrams]
-                       //!
-                       //! Encoding
-                       //! ```
-                       //! <term> ::= 00                      abstraction
-                       //!          | 01 <term> <term>        application
-                       //!          | 1 <var>                 variable
-                       //! <var> ::= 0 | 1 <var>
-                       //! ```
+//! Binary Lambda Calculus Playground
+//!
+//! This module defines a representation of λ-calculus and
+//! provides parsers and printers for it.  The aim of this module
+//! is to enable experimentation with the binary encoding described
+//! by John Tromp, see [BLC](https://en.wikipedia.org/wiki/Binary_combinatory_logic)
+//! and [Diagrams](https://tromp.github.io/cl/diagrams.html)
+//!
+//! Encoding
+//! ```pseudo
+//! <term> ::= 00                      abstraction
+//!          | 01 <term> <term>        application
+//!          | 1 <var>                 variable
+//! <var> ::= 0 | 1 <var>
+//! ```
 
-mod list;
+pub mod list;
 
-use list::List::*;
 use list::*;
 use std::fmt;
-use std::ops::Sub;
+use List::*;
 use Term::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Term {
-    Ab(Box<Term>),            // Abstraction
-    Ap(Box<Term>, Box<Term>), // Application
-    Va(usize),                // de Bruijn encoded variable
+    /// Abstraction wraps a λ-terms in a λ x .
+    Ab(Box<Term>),
+    /// Application of two λ-terms
+    Ap(Box<Term>, Box<Term>),
+    /// Variables, de Bruijn encoded (count the number of abstractions)
+    Va(usize),
 }
 
-pub fn ap(t1: Term, t2: Term) -> Term {
-    Ap(Box::new(t1), Box::new(t2))
-}
-
-impl Sub for Term {
-    type Output = Term;
-    fn sub(self, other: Term) -> Term {
-        ap(self, other)
-    }
-}
-
-const CUTE: &[u8] = b"xyzwvabcdef";
+const CLASSIC_NAMES: &[u8] = b"xyzwvabcdef";
 
 fn fmt_var(f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-    if level < CUTE.len() {
-        write!(f, "{}", CUTE[level] as char)
+    if level < CLASSIC_NAMES.len() {
+        write!(f, "{}", CLASSIC_NAMES[level] as char)
     } else {
         write!(f, "n{}", level)
     }
@@ -68,20 +58,16 @@ impl Term {
                 write!(f, ")")
             }
             Va(n) if *n < level => fmt_var(f, level - *n - 1),
-            Va(n) => write!(f, "v{}? (@ level {})", *n - 1, level),
+            Va(n) => write!(f, "v{}", *n - 1),
         }
     }
 }
 
+/// λ-terms implement the `Display` trait
 impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_level(f, 0)
     }
-}
-
-#[test]
-fn trim() {
-    assert_eq!("  abc  ".trim_start(), "abc  ")
 }
 
 fn parse_var(src: &str) -> Result<(&str, &str), &str> {
@@ -144,7 +130,7 @@ fn parse_exp<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), &
         match parse_term(src, env) {
             Ok((t, src2)) => {
                 src = src2;
-                e = ap(e, t);
+                e = Ap(Box::new(e), Box::new(t));
             }
             Err(_) => {
                 return Ok((e, src));
@@ -182,40 +168,68 @@ fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), 
     }
 }
 
-#[test]
-fn test_parse_term() {
-    let i = Ab(Box::new(Va(0)));
-    assert_eq!(parse_term("λx.x", &Nil), Ok((i.clone(), "")));
-    assert_eq!(
-        parse_term("λx y.x", &Nil),
-        Ok((Ab(Box::new(Ab(Box::new(Va(1))))), ""))
-    );
-    assert_eq!(parse_term("(λx.x)", &Nil), Ok((i.clone(), "")));
-    {
-        let x = Box::new(Va(0));
-        let ap = Box::new(Ap(x.clone(), x));
-        let ab = Ab(ap);
-        assert_eq!(&parse_term("λx.x x", &Nil), &Ok((ab.clone(), "")));
-        assert_eq!(parse_term("λx.(x) (x)", &Nil), Ok((ab.clone(), "")));
-        assert_eq!(parse_term("λx.(x x)", &Nil), Ok((ab.clone(), "")));
-        assert_eq!(
-            parse_term("  λ  x  .  (  (  x  )  (  x  )  )  ", &Nil),
-            Ok((ab.clone(), "  "))
-        );
+/// Parse λ-terms
+///
+/// The textual language of λ-terms is
+///
+/// ```grammar
+/// var ::= <alpha><alphanum>*
+/// exp ::= var | λ var* . exp | exp exp*
+/// ```
+///
+/// # Example
+///
+/// Use parse a string expression and pretty-print it.
+///
+/// NOTE: unparsing cannot reconstruct the last variable names, thus the
+/// variable names will most likely differ.
+/// ```
+/// assert_eq!(
+///     blc::parse("λ a b . (a λx.b)").unwrap().to_string(),
+///     "λx.λy.(x) (λz.y)");
+/// ```
+
+pub fn parse<'a>(src: &'a str) -> Result<Term, &'a str> {
+    match parse_exp(src, &Nil) {
+        Ok((res, src)) if src.trim_start() == "" => Ok(res),
+        Ok((_, src)) => Err(src),
+        Err(err) => Err(err),
     }
-    assert_eq!(
-        parse_exp("(λx.x)(λx.x)", &Nil),
-        Ok((ap(i.clone(), i.clone()), ""))
-    );
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
+    #[test]
+    fn test_parse_term() {
+        let i = Ab(Box::new(Va(0)));
+        assert_eq!(parse_term("λx.x", &Nil), Ok((i.clone(), "")));
+        assert_eq!(
+            parse_term("λx y.x", &Nil),
+            Ok((Ab(Box::new(Ab(Box::new(Va(1))))), ""))
+        );
+        assert_eq!(parse_term("(λx.x)", &Nil), Ok((i.clone(), "")));
+        {
+            let x = Box::new(Va(0));
+            let ap = Box::new(Ap(x.clone(), x));
+            let ab = Ab(ap);
+            assert_eq!(&parse_term("λx.x x", &Nil), &Ok((ab.clone(), "")));
+            assert_eq!(parse_term("λx.(x) (x)", &Nil), Ok((ab.clone(), "")));
+            assert_eq!(parse_term("λx.(x x)", &Nil), Ok((ab.clone(), "")));
+            assert_eq!(
+                parse_term("  λ  x  .  (  (  x  )  (  x  )  )  ", &Nil),
+                Ok((ab.clone(), "  "))
+            );
+        }
+        assert_eq!(
+            parse_exp("(λx.x)(λx.x)", &Nil),
+            Ok((Ap(Box::new(i.clone()), Box::new(i.clone())), ""))
+        );
+    }
+
     fn round_trip(src: &str, expected: &str) -> Result<(), String> {
-        let (e, src) = parse_exp(src, &Nil)?;
-        assert_eq!(src.trim_start(), "");
+        let e = parse(src)?;
         assert_eq!(e.to_string(), expected);
         Ok(())
     }
@@ -227,18 +241,22 @@ mod test {
         assert_eq!(&i.to_string(), "λx.x");
         assert_eq!(Ab(Box::new(i.clone())).to_string(), "λx.λy.y");
 
-        assert_eq!(ap(i.clone(), i).to_string(), "(λx.x) (λx.x)");
+        assert_eq!(
+            Ap(Box::new(i.clone()), Box::new(i)).to_string(),
+            "(λx.x) (λx.x)"
+        );
         round_trip(" λ y . y ", "λx.x")?;
         round_trip("λx.λy.x", "λx.λy.x")?;
         Ok(())
     }
-}
 
-pub fn main() {
-    println!("{:?}", parse_exp("x", &Nil));
-    println!(
-        "{:?}",
-        Ap(Box::new(Ab(Box::new(Va(0)))), Box::new(Ab(Box::new(Va(0)))))
-    );
-    let _primes = "00010001100110010100011010000000010110000010010001010111110111101001000110100001110011010000000000101101110011100111111101111000000001111100110111000000101100000110110";
+    #[test]
+    pub fn main() {
+        println!("{:?}", parse("x"));
+        println!(
+            "{:?}",
+            Ap(Box::new(Ab(Box::new(Va(0)))), Box::new(Ab(Box::new(Va(0)))))
+        );
+        let _primes = "00010001100110010100011010000000010110000010010001010111110111101001000110100001110011010000000000101101110011100111111101111000000001111100110111000000101100000110110";
+    }
 }
