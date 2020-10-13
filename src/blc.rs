@@ -123,7 +123,7 @@ fn parse_abs<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), &
     let src = src.trim_start();
 
     if let Ok((var, src)) = parse_var(src) {
-        let (body, src) = parse_abs(src, &cons(var, &env))?;
+        let (body, src) = parse_abs(src, &env.cons(var))?;
         return Ok((Ab(Box::new(body)), src));
     }
 
@@ -170,11 +170,11 @@ fn parse_term<'a>(src: &'a str, env: &List<&'a str>) -> Result<(Term, &'a str), 
     let mut e = env;
     let mut n = 0;
     loop {
-        if !is_empty(e) {
-            if head(e) == Some(&v) {
+        if !e.is_empty() {
+            if e.head() == &v {
                 return Ok((Va(n), src));
             }
-            e = tail(e).unwrap();
+            e = e.tail();
             n += 1;
         } else {
             return Err("Unknown variable");
